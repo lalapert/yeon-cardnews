@@ -14,7 +14,7 @@
 ## 0. 준비
 
 ```
-git pull -q origin main
+git fetch -q origin main && git checkout -q -B main origin/main   # 최신 main 위에서 시작 (클라우드는 브랜치 없이 시작할 수 있음)
 [ -d node_modules ] || npm run setup      # playwright-core 설치 (클라우드에는 Chromium이 미리 깔려 있음)
 ```
 

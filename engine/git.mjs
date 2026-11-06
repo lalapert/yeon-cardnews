@@ -21,11 +21,14 @@ function identity() {
   return email ? [] : ['-c', 'user.name=yeon-news-bot', '-c', 'user.email=lalapert@users.noreply.github.com'];
 }
 
+// The pipeline always publishes to main. Cloud checkouts can start on a detached HEAD
+// (`rev-parse --abbrev-ref` then says "HEAD"), so never derive the target from the checkout.
+export const TARGET = process.env.YEON_BRANCH || 'main';
 export function branch() {
-  return git('rev-parse', '--abbrev-ref', 'HEAD').trim();
+  return TARGET;
 }
 
-// Stage `paths`, commit if anything changed, push to the current branch (rebasing on conflicts).
+// Stage `paths`, commit if anything changed, push to main (rebasing on conflicts).
 export function commitAndPush(paths, message) {
   git('add', '--', ...paths);
   if (!git('status', '--porcelain', '--', ...paths).trim()) return { changed: false, branch: branch() };
@@ -33,11 +36,11 @@ export function commitAndPush(paths, message) {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const b = branch();
+  const b = TARGET;
   let last;
   for (let i = 0; i < 3; i++) {
     try {
-      git('push', '-q', 'origin', `HEAD:${b}`);
+      git('push', '-q', 'origin', `HEAD:refs/heads/${b}`);
       return { changed: true, branch: b };
     } catch (e) {
       last = e;
