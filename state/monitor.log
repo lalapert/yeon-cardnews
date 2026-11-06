@@ -5,3 +5,4 @@
 2026-11-06T23:33:42+09:00 SKIP local test: push from detached HEAD
 2026-11-06T23:34:54+09:00 SKIP 간격 미충족(직전 예약 23:35), 9점 이상 초대형 속보 후보 없음
 2026-11-06T23:38:04+09:00 UPDATE 2026-11-06_food-label status=published publicUrl=https://www.instagram.com/p/DfZ1dVsCM6m/
+2026-11-07T07:08:06+09:00 SKIP 검색에서 12시간 이내 검증 가능한 후보를 찾지 못함 (최고점 <7)
