@@ -4,7 +4,7 @@
   "type": "module",
   "description": "News card generator + publisher for Instagram @yeon.virel",
   "scripts": {
-    "setup": "npm install && npx playwright-core install --with-deps chromium",
+    "setup": "npm install && (npx playwright-core install chromium || echo 'Chromium download blocked - using the preinstalled browser')",
     "status": "node engine/state.mjs status"
   },
   "dependencies": {

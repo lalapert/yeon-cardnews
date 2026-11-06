@@ -15,7 +15,7 @@
 
 ```
 git pull -q origin main
-[ -d node_modules ] || npm run setup      # 처음 한 번: playwright-core + Chromium 설치
+[ -d node_modules ] || npm run setup      # playwright-core 설치 (클라우드에는 Chromium이 미리 깔려 있음)
 ```
 
 ## 1. 페이스 확인
