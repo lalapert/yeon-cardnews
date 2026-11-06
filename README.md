@@ -1,4 +1,11 @@
 # yeon-cardnews
 
-Card-news images for Instagram @yeon.virel, served to Metricool for publishing.
-Generated automatically; each folder under `posts/` is one carousel.
+News card-news generator and publisher for Instagram **@yeon.virel**.
+
+- `GUIDE.md` — editorial rules and the step-by-step flow the hourly monitor follows
+- `engine/` — `render.mjs` (post.json → 1080×1350 PNG/JPG via headless Chromium), `templates.mjs` (layouts, color themes),
+  `publish.mjs` (push slides, print public image URLs), `state.mjs` (posting log + pacing)
+- `posts/<id>/` — one carousel each: `post.json`, `caption.txt`, `sources.txt`, `slide_N.jpg`
+- `state/` — `posted.jsonl` (what was scheduled) and `monitor.log` (every check)
+
+Setup: `npm run setup` (installs playwright-core and Chromium). Fonts: Pretendard (SIL OFL 1.1, `engine/fonts/LICENSE.txt`).

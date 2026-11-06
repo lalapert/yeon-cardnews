@@ -1,0 +1,13 @@
+{
+  "name": "yeon-cardnews",
+  "private": true,
+  "type": "module",
+  "description": "News card generator + publisher for Instagram @yeon.virel",
+  "scripts": {
+    "setup": "npm install && npx playwright-core install --with-deps chromium",
+    "status": "node engine/state.mjs status"
+  },
+  "dependencies": {
+    "playwright-core": "1.49.1"
+  }
+}

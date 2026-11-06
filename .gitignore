@@ -1,0 +1,4 @@
+node_modules/
+posts/*/html/
+posts/*/*.png
+posts/*/media.json

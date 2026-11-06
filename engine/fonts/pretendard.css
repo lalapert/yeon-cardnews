@@ -1,0 +1,6 @@
+/* Pretendard (SIL Open Font License 1.1, see LICENSE.txt) - only the weights the cards use */
+@font-face{font-family:'Pretendard';font-weight:500;font-style:normal;src:url('Pretendard-Medium.woff2') format('woff2')}
+@font-face{font-family:'Pretendard';font-weight:600;font-style:normal;src:url('Pretendard-SemiBold.woff2') format('woff2')}
+@font-face{font-family:'Pretendard';font-weight:700;font-style:normal;src:url('Pretendard-Bold.woff2') format('woff2')}
+@font-face{font-family:'Pretendard';font-weight:800;font-style:normal;src:url('Pretendard-ExtraBold.woff2') format('woff2')}
+@font-face{font-family:'Pretendard';font-weight:900;font-style:normal;src:url('Pretendard-Black.woff2') format('woff2')}
