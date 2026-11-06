@@ -4,7 +4,7 @@
 // Exit code != 0 means the images are NOT reachable; do not schedule the post.
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, REPO, commitAndPush } from './git.mjs';
+import { ROOT, REPO, commitAndPush, git } from './git.mjs';
 
 const postDir = path.resolve(process.argv[2] || '');
 if (!fs.existsSync(path.join(postDir, 'post.json'))) {
@@ -38,7 +38,10 @@ try {
   process.exit(3);
 }
 
-const raw = `https://raw.githubusercontent.com/${REPO}/${result.branch}`;
+// Pin URLs to the commit, not the branch: a re-rendered slide with the same file name then gets a
+// new URL, so Metricool never picks up a stale cached copy.
+const sha = git('rev-parse', 'HEAD').trim();
+const raw = `https://raw.githubusercontent.com/${REPO}/${sha}`;
 const urls = slides.map((f) => `${raw}/${rel}/${f}`);
 
 // raw.githubusercontent.com can lag a few seconds behind a push; wait until every image answers.
@@ -59,6 +62,6 @@ if (bad.length) {
   process.exit(4);
 }
 
-const out = { id, branch: result.branch, urls };
+const out = { id, branch: result.branch, commit: sha, urls };
 fs.writeFileSync(path.join(postDir, 'media.json'), JSON.stringify(out, null, 2));
 console.log(JSON.stringify(out));

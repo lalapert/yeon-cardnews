@@ -68,7 +68,7 @@ export const THEMES = {
     stampTop: '#5968B2', barFill: 'linear-gradient(90deg,#5968B2,#8EA0E6)',
   },
 };
-export const DEFAULT_THEME = 'ember';
+export const DEFAULT_THEME = 'virel'; // 대표 선택 2026-11-06 (③ VIREL 네이비)
 
 function themeVars(name) {
   const t = THEMES[name] || THEMES[DEFAULT_THEME];
