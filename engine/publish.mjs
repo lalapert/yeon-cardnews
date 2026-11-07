@@ -26,6 +26,29 @@ if (!slides.length) {
   process.exit(1);
 }
 
+// The same caption goes to Instagram, Threads and Facebook in one Metricool post. Threads caps text at
+// 500 and counts emoji as their UTF-8 bytes, so count symbols/emoji by bytes and everything else as 1.
+const THREADS_MAX = 500;
+function threadsLength(text) {
+  let n = 0;
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    const plain = cp < 0x2000 || (cp >= 0x3000 && cp <= 0xd7ff) || (cp >= 0xff00 && cp <= 0xffef);
+    n += plain ? 1 : Buffer.byteLength(ch, 'utf8');
+  }
+  return n;
+}
+const captionFile = path.join(postDir, 'caption.txt');
+if (!fs.existsSync(captionFile)) {
+  console.error('no caption.txt');
+  process.exit(1);
+}
+const captionLen = threadsLength(fs.readFileSync(captionFile, 'utf8').trim());
+if (captionLen > THREADS_MAX) {
+  console.error(`caption.txt is ${captionLen} (Threads count) > ${THREADS_MAX} - shorten it and run again`);
+  process.exit(5);
+}
+
 const files = [...slides, 'post.json', 'caption.txt', 'sources.txt']
   .filter((f) => fs.existsSync(path.join(postDir, f)))
   .map((f) => `${rel}/${f}`);
