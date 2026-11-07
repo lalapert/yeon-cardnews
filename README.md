@@ -9,5 +9,6 @@ News card-news generator and publisher for **@yeon.virel** — one Metricool pos
 - `posts/<id>/` — one carousel each: `post.json`, `caption.txt`, `sources.txt`, `slide_N.jpg`
 - `state/` — `posted.jsonl` (what was scheduled) and `monitor.log` (every check)
 - `docs/ig-agent-skill-review.md` — what was taken from the instagram-agent-skill pack and why
+- `engine/audit.mjs` + `docs/AUDIT.md` — the weekly performance audit (Metricool numbers -> `state/audit/<date>.md`)
 
 Setup: `npm run setup` (installs playwright-core and Chromium). Fonts: Pretendard (SIL OFL 1.1, `engine/fonts/LICENSE.txt`).
