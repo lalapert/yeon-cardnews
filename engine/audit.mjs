@@ -11,24 +11,27 @@
 //
 // Raw file format (rows exactly as getAnalyticsDataByMetrics returns them, one array per network):
 //   { "fetchedAt": "<ISO>", "from": "<ISO>", "to": "<ISO>", "instagram": [[...]], "threads": [[...]], "facebook": [[...]] }
+// No caption text is requested: rows stay small enough to copy by hand, and posts are matched to
+// state/posted.jsonl by publish time instead.
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, commitAndPush } from './git.mjs';
 
 export const FIELDS = {
   instagram: {
-    ids: ['IGPO02', 'IGPO06', 'IGPO03', 'IGPO07', 'IGPO14', 'IGPO28', 'IGPO13', 'IGPO08', 'IGPO15', 'IGPO27', 'IGPO29'],
-    names: ['time', 'url', 'text', 'type', 'reach', 'views', 'likes', 'comments', 'saves', 'shares', 'follows'],
+    ids: ['IGPO02', 'IGPO06', 'IGPO07', 'IGPO14', 'IGPO28', 'IGPO13', 'IGPO08', 'IGPO15', 'IGPO27', 'IGPO29'],
+    names: ['time', 'url', 'type', 'reach', 'views', 'likes', 'comments', 'saves', 'shares', 'follows'],
   },
   threads: {
-    ids: ['THPO02', 'THPO06', 'THPO03', 'THPO08', 'THPO09', 'THPO10', 'THPO11', 'THPO12', 'THPO13'],
-    names: ['time', 'url', 'text', 'reach', 'likes', 'comments', 'reposts', 'quotes', 'shares'], // reach = views
+    ids: ['THPO02', 'THPO06', 'THPO08', 'THPO09', 'THPO10', 'THPO11', 'THPO12', 'THPO13'],
+    names: ['time', 'url', 'reach', 'likes', 'comments', 'reposts', 'quotes', 'shares'], // reach = views
   },
   facebook: {
-    ids: ['FBPO02', 'FBPO06', 'FBPO03', 'FBPO12', 'FBPO11', 'FBPO13', 'FBPO08', 'FBPO14', 'FBPO23'],
-    names: ['time', 'url', 'text', 'reach', 'impressions', 'likes', 'comments', 'shares', 'clicks'], // likes = reactions
+    ids: ['FBPO02', 'FBPO06', 'FBPO12', 'FBPO11', 'FBPO13', 'FBPO08', 'FBPO14', 'FBPO23'],
+    names: ['time', 'url', 'reach', 'impressions', 'likes', 'comments', 'shares', 'clicks'], // likes = reactions
   },
 };
+const MATCH_MIN = 15; // a Metricool row within this many minutes of a logged scheduledAt is that post
 export const MIN_POSTS = 30; // below this, report numbers but draw no conclusions
 export const MIN_MEDIAN_REACH = 30; // below this, per-reach ratios are noise
 const MATURE_H = 48; // Metricool lags and posts keep collecting for a day or two
@@ -40,7 +43,6 @@ const median = (a) => {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
-const key = (text) => (text || '').normalize('NFC').replace(/[^\p{L}\p{N}]/gu, '').slice(0, 30);
 const parseTime = (t) => {
   const m = String(t).match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/); // Metricool sends UTC
   return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : new Date(t);
@@ -49,49 +51,61 @@ const kst = (d) => new Date(d.getTime() + 9 * 3600e3);
 const fmtKst = (d) => kst(d).toISOString().slice(5, 16).replace('T', ' ');
 const pct = (a, b) => (b > 0 ? `${((100 * a) / b).toFixed(1)}%` : '-');
 const x1 = (v) => (Number.isFinite(v) ? `${v.toFixed(1)}x` : '-');
-const cut = (s, n) => {
-  const t = (s || '').split('\n').find((l) => l.trim()) || '';
-  return [...t].length > n ? [...t].slice(0, n).join('') + '…' : t;
-};
+const cut = (s, n) => ([...(s || '')].length > n ? [...s].slice(0, n).join('') + '…' : s || '');
+const shortUrl = (u) => (u || '').split('/').filter(Boolean).pop() || ''; // last path part: the post code
+const NET = { instagram: 'IG', threads: 'TH', facebook: 'FB' };
 
-// Our own posts: caption key -> post id and the bits worth grouping by.
+// Our own posts from state/posted.jsonl, with the times each network got them (the Threads/Facebook
+// copy of a post can go out later, logged as threadsFacebookAt) and the bits worth grouping by.
 function ourPosts() {
-  const dir = path.join(ROOT, 'posts');
-  const out = new Map();
-  for (const id of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
-    const cap = path.join(dir, id, 'caption.txt');
-    const pj = path.join(dir, id, 'post.json');
-    if (!fs.existsSync(cap) || !fs.existsSync(pj)) continue;
-    let post = {};
-    try {
-      post = JSON.parse(fs.readFileSync(pj, 'utf8'));
-    } catch {}
-    const cover = post.slides?.[0] || {};
-    const coverKind = ['number', 'change', 'vs', 'stamps'].find((k) => cover[k]) || 'text';
-    const hashtags = (fs.readFileSync(cap, 'utf8').match(/(?:^|\s)#[\p{L}\p{N}_]+/gu) || []).length;
-    out.set(key(fs.readFileSync(cap, 'utf8')), {
-      id,
-      category: post.category || '-',
-      urgency: post.urgency || 'normal',
-      slides: post.slides?.length || 0,
-      coverKind,
-      hashtags,
+  const file = path.join(ROOT, 'state', 'posted.jsonl');
+  const rows = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  return rows
+    .filter((r) => r.status !== 'cancelled' && r.status !== 'draft')
+    .map((r) => {
+      let post = {};
+      try {
+        post = JSON.parse(fs.readFileSync(path.join(ROOT, 'posts', r.id, 'post.json'), 'utf8'));
+      } catch {}
+      let caption = '';
+      try {
+        caption = fs.readFileSync(path.join(ROOT, 'posts', r.id, 'caption.txt'), 'utf8');
+      } catch {}
+      const cover = post.slides?.[0] || {};
+      const ig = new Date(r.scheduledAt);
+      const other = r.threadsFacebookAt ? new Date(r.threadsFacebookAt) : ig;
+      return {
+        id: r.id,
+        headline: r.headline || '',
+        at: { instagram: ig, threads: other, facebook: other },
+        category: post.category || '-',
+        coverKind: ['number', 'change', 'vs', 'stamps'].find((k) => cover[k]) || 'text',
+        slides: post.slides?.length || 0,
+        hashtags: (caption.match(/(?:^|\s)#[\p{L}\p{N}_]+/gu) || []).length,
+      };
     });
+}
+function matchOurs(ours, net, at) {
+  let best = null;
+  for (const o of ours) {
+    const d = Math.abs(at - o.at[net]) / 60000;
+    if (d <= MATCH_MIN && (!best || d < best.d)) best = { o, d };
   }
-  return out;
+  return best ? best.o : null;
 }
 
 export function buildReport(raw, notes = '') {
   const fetched = new Date(raw.fetchedAt || Date.now());
   const ours = ourPosts();
-  const posts = new Map(); // caption key -> merged row
+  const posts = new Map(); // our post id, or network+url for posts this repo did not make
   for (const net of ['instagram', 'threads', 'facebook']) {
     const names = FIELDS[net].names;
     for (const r of raw[net] || []) {
       const row = Object.fromEntries(names.map((n, i) => [n, r[i]]));
-      const k = key(row.text) || row.url;
       const at = parseTime(row.time);
-      const p = posts.get(k) || { key: k, at, text: row.text, meta: ours.get(k) || null };
+      const meta = matchOurs(ours, net, at);
+      const k = meta ? meta.id : `${net}:${row.url}`;
+      const p = posts.get(k) || { key: k, at, label: meta ? meta.headline : `${NET[net]} ${shortUrl(row.url)}`, meta };
       if (at < p.at) p.at = at;
       p[net] = {
         url: row.url,
@@ -132,7 +146,7 @@ export function buildReport(raw, notes = '') {
     `게시물: 인스타 ${count('instagram', all)} · 쓰레드 ${count('threads', all)} · 페북 ${count('facebook', all)}` +
       ` (48시간 지난 것 인스타 ${count('instagram', mature)}개, 그중 이 저장소 카드뉴스 ${oursMature.length}개)`,
     '',
-    '이 저장소 카드뉴스는 세 곳에 같은 캡션이 나가서 한 줄로 묶인다. 이전 방식 게시물은 네트워크마다 캡션이 달라 따로 잡힌다.',
+    '이 저장소 카드뉴스는 state/posted.jsonl 의 예약 시각(±15분)으로 찾아 세 네트워크를 한 줄로 묶는다. 이전 방식 게시물은 네트워크마다 따로 잡힌다.',
     ''
   );
   L.push('## 판정', '');
@@ -156,8 +170,8 @@ export function buildReport(raw, notes = '') {
   L.push('', '쓰레드의 "도달"은 조회수(views)다. 배수 = 그 게시물 도달 ÷ 그 네트워크 도달 중앙값.', '');
 
   const line = (p) =>
-    `| ${fmtKst(p.at)} | ${p.meta ? p.meta.id : '(이전 방식)'} | ${cut(p.text, 24).replace(/\|/g, '/')} | ${p.instagram?.reach ?? '-'} | ${x1(p.mult.instagram)} | ${p.instagram?.saves ?? '-'} | ${p.instagram?.shares ?? '-'} | ${p.instagram?.follows ?? '-'} | ${p.threads?.reach ?? '-'} | ${p.facebook?.reach ?? '-'} |`;
-  const head = '| 게시(KST) | 게시물 | 첫 줄 | IG 도달 | IG 배수 | 저장 | 공유 | 팔로우 | 쓰레드 조회 | 페북 도달 |\n|---|---|---|---|---|---|---|---|---|---|';
+    `| ${fmtKst(p.at)} | ${p.meta ? p.meta.id : '(이전 방식)'} | ${cut(p.label, 24).replace(/\|/g, '/')} | ${p.instagram?.reach ?? '-'} | ${x1(p.mult.instagram)} | ${p.instagram?.saves ?? '-'} | ${p.instagram?.shares ?? '-'} | ${p.instagram?.follows ?? '-'} | ${p.threads?.reach ?? '-'} | ${p.facebook?.reach ?? '-'} |`;
+  const head = '| 게시(KST) | 게시물 | 제목·주소 | IG 도달 | IG 배수 | 저장 | 공유 | 팔로우 | 쓰레드 조회 | 페북 도달 |\n|---|---|---|---|---|---|---|---|---|---|';
   const ranked = [...ig].sort((a, b) => (b.mult.instagram || 0) - (a.mult.instagram || 0) || b.instagram.saves + b.instagram.shares - (a.instagram.saves + a.instagram.shares));
   L.push('## 인스타 배수 상위 5', '', head, ...ranked.slice(0, 5).map(line), '');
   const bottom = ranked.slice(Math.max(5, ranked.length - 5)).reverse(); // never repeat a top-5 row
