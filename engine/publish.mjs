@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, REPO, commitAndPush, git } from './git.mjs';
+import { checkCaptionFile } from './caption.mjs';
 
 const postDir = path.resolve(process.argv[2] || '');
 if (!fs.existsSync(path.join(postDir, 'post.json'))) {
@@ -26,27 +27,19 @@ if (!slides.length) {
   process.exit(1);
 }
 
-// The same caption goes to Instagram, Threads and Facebook in one Metricool post. Threads caps text at
-// 500 and counts emoji as their UTF-8 bytes, so count symbols/emoji by bytes and everything else as 1.
-const THREADS_MAX = 500;
-function threadsLength(text) {
-  let n = 0;
-  for (const ch of text) {
-    const cp = ch.codePointAt(0);
-    const plain = cp < 0x2000 || (cp >= 0x3000 && cp <= 0xd7ff) || (cp >= 0xff00 && cp <= 0xffef);
-    n += plain ? 1 : Buffer.byteLength(ch, 'utf8');
-  }
-  return n;
-}
+// The same caption goes to Instagram, Threads and Facebook in one Metricool post. Clean it in place
+// (invisible characters, em dashes, curly quotes) and stop before pushing if it breaks a rule:
+// exit 5 = over Threads' 500, exit 6 = more than 5 hashtags or a link.
 const captionFile = path.join(postDir, 'caption.txt');
 if (!fs.existsSync(captionFile)) {
   console.error('no caption.txt');
   process.exit(1);
 }
-const captionLen = threadsLength(fs.readFileSync(captionFile, 'utf8').trim());
-if (captionLen > THREADS_MAX) {
-  console.error(`caption.txt is ${captionLen} (Threads count) > ${THREADS_MAX} - shorten it and run again`);
-  process.exit(5);
+const caption = checkCaptionFile(captionFile);
+for (const w of caption.report.warnings) console.error(`caption warning: ${w}`);
+if (caption.exitCode) {
+  console.error(`caption.txt: ${caption.report.errors.join('; ')} - fix it and run again`);
+  process.exit(caption.exitCode);
 }
 
 const files = [...slides, 'post.json', 'caption.txt', 'sources.txt']
@@ -85,6 +78,6 @@ if (bad.length) {
   process.exit(4);
 }
 
-const out = { id, branch: result.branch, commit: sha, urls };
+const out = { id, branch: result.branch, commit: sha, urls, caption: caption.report };
 fs.writeFileSync(path.join(postDir, 'media.json'), JSON.stringify(out, null, 2));
 console.log(JSON.stringify(out));
