@@ -1,6 +1,6 @@
 # yeon-cardnews
 
-News card-news generator and publisher for Instagram **@yeon.virel**.
+News card-news generator and publisher for **@yeon.virel** — one Metricool post goes to Instagram, Threads and Facebook together.
 
 - `GUIDE.md` — editorial rules and the step-by-step flow the hourly monitor follows
 - `engine/` — `render.mjs` (post.json → 1080×1350 PNG/JPG via headless Chromium), `templates.mjs` (layouts, color themes),

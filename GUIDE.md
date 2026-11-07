@@ -3,7 +3,8 @@
 매시간 한 번 실행되는 감시 작업(클라우드 루틴)이 이 문서를 그대로 따른다. 한 번 실행에 **최대 1개**만 게시한다.
 게시할 만한 게 없으면 아무것도 만들지 말고 기록만 남기고 끝낸다. (억지로 올리는 것보다 안 올리는 게 낫다.)
 
-- 계정: Instagram `@yeon.virel` (Metricool brand `7763847`, 시간대 `Asia/Seoul`)
+- 계정: Metricool brand `7763847` (시간대 `Asia/Seoul`) 하나에 연결된 **세 곳에 한 게시물로 동시에** 올린다.
+  Instagram `@yeon.virel` · Threads `@yeon.virel` · Facebook 페이지 `1291754897360211`
 - 저장소: `lalapert/yeon-cardnews` (공개). **모든 명령은 저장소 최상위 폴더에서 실행한다.**
 - 엔진: `engine/` (`render.mjs`, `publish.mjs`, `state.mjs`, `templates.mjs`, `git.mjs`, `fonts/`)
 - 게시물 폴더: `posts/YYYY-MM-DD_HHMM_<영문-슬러그>/`
@@ -147,7 +148,9 @@ node engine/render.mjs posts/<id>
 - 1줄째: 표지 훅을 사실대로 풀어쓴 문장 (표지보다 더 자극적이면 안 됨)
 - 3~6줄: 핵심 사실, 필요하면 `✔️` 목록
 - 마무리 한 줄: 저장·공유 유도 (팔로우 구걸·링크 금지)
-- 해시태그 6~10개, `#뉴스브리프` 항상 포함. 전체 2,000자 이내.
+- 해시태그 6~10개, `#뉴스브리프` 항상 포함.
+- **전체 500자 이내.** 같은 캡션이 쓰레드에도 나가는데 쓰레드 한도가 500자다 (이모지는 바이트 수로 세서 ✔️ 하나가 6자, 🔖 하나가 4자).
+  `publish.mjs` 가 같은 방식으로 세어 넘으면 종료 코드 5로 멈춘다. 그러면 설명 줄을 줄여서 다시 실행한다.
 
 ## 8. 게시
 
@@ -155,21 +158,26 @@ node engine/render.mjs posts/<id>
    ```
    node engine/publish.mjs posts/<id>
    ```
-   종료 코드가 0이 아니면 게시하지 말고 `skip` 기록 후 종료. 출력 JSON 의 `urls` 를 쓴다.
-2. Metricool `createScheduledPost`:
+   종료 코드 5 = 캡션이 500자를 넘음 → 캡션을 줄이고 다시 실행. 그 밖에 0이 아니면 게시하지 말고 `skip` 기록 후 종료. 출력 JSON 의 `urls` 를 쓴다.
+2. Metricool `createScheduledPost` (인스타·쓰레드·페이스북 **한 게시물에 provider 3개**. 네트워크별로 따로 만들지 않는다):
    - `blogId`: `"7763847"`
    - `date`: 지금으로부터 10분 뒤, 5분 단위로 올림 (예: `2026-11-07T09:15:00+09:00`). 과거 시각 불가.
    - `info` (JSON 문자열):
      ```json
      {"autoPublish":true,"draft":false,"descendants":[],"firstCommentText":"","hasNotReadNotes":false,
-      "shortener":false,"smartLinkData":{"ids":[]},"providers":[{"network":"instagram"}],
+      "shortener":false,"smartLinkData":{"ids":[]},
+      "providers":[{"network":"instagram"},{"network":"threads"},{"network":"facebook"}],
       "publicationDate":{"dateTime":"2026-11-07T09:15:00","timezone":"Asia/Seoul"},
       "media":["<publish.mjs 의 urls 순서대로>"],
       "mediaAltText":["슬라이드별 한 줄 설명"],
       "text":"<caption.txt 내용>",
-      "instagramData":{"type":"POST","isAiGenerated":false}}
+      "instagramData":{"type":"POST","isAiGenerated":false},
+      "threadsData":{},
+      "facebookData":{"type":"POST"}}
      ```
    - 오류가 나면 **바로 다시 만들지 말 것** (중복 게시 위험). `getScheduledPosts` 로 그 시간대에 이미 생겼는지 먼저 확인하고, 없을 때만 한 번 더 시도. 그래도 실패하면 기록 후 종료.
+   - 만든 뒤 `getScheduledPosts` 로 그 게시물의 `providers` 에 instagram·threads·facebook 세 개가 모두 있는지 본다.
+     한 곳이 빠졌으면 그 곳만 따로 새 게시물을 만들지 말고(중복 위험) 보고 줄에 "<네트워크> 빠짐"을 적는다.
 3. 기록 (응답의 `plannerUrl`, `id`, `uuid` 사용 — 기록은 자동으로 커밋·푸시된다):
    ```
    node engine/state.mjs record posts/<id> "<plannerUrl>" "<date>" "<id>" "<uuid>"
