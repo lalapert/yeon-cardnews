@@ -14,7 +14,7 @@ const STATE = path.join(ROOT, 'state');
 const POSTED = path.join(STATE, 'posted.jsonl');
 const LOG = path.join(STATE, 'monitor.log');
 export const MAX_PER_DAY = 6;
-export const MIN_GAP_MIN = 120; // breaking news may ignore the gap, never the daily cap
+export const MIN_GAP_MIN = 0; // no spacing between posts (owner's call, 2026-11-07); the daily cap still holds
 
 fs.mkdirSync(STATE, { recursive: true });
 
@@ -54,7 +54,7 @@ if (cmd === 'status') {
   const last = past.length ? past[past.length - 1] : null;
   const upcoming = live.filter((p) => new Date(p.scheduledAt) > now);
   const minsSinceLast = last ? Math.round((now - new Date(last.scheduledAt)) / 60000) : null;
-  const gapOk = !upcoming.length && (minsSinceLast === null || minsSinceLast >= MIN_GAP_MIN);
+  const gapOk = minsSinceLast === null || minsSinceLast >= MIN_GAP_MIN;
   const recent = all.filter((p) => Math.abs(now - new Date(p.scheduledAt)) < 3 * 86400e3);
   console.log(
     JSON.stringify(

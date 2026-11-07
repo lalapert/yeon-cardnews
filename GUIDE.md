@@ -26,8 +26,8 @@ node engine/state.mjs status
 ```
 
 - `leftToday` 가 0 → 오늘은 끝. `node engine/state.mjs skip "daily cap"` 후 종료.
-- `canPostNormal` 이 false 이고 `canPostBreaking` 만 true → **초대형 속보(9점 이상)만** 올릴 수 있다.
-- `upcomingScheduled` 에 예약이 남아 있으면 그 시각과 2시간 이상 떨어뜨려 예약한다.
+- 게시 간격 제한은 없다. 올릴 만한 건(7점 이상)이 있으면 바로 올린다.
+- `upcomingScheduled` 에 아직 안 나간 예약이 있으면, 새 예약은 그 시각보다 10분 이상 뒤로 잡는다 (같은 시각에 두 개가 겹치지 않게).
 - `recentTopics` (최근 3일, draft 포함) 와 같은 이야기는 다시 올리지 않는다. 같은 사건이라도 **결정적인 새 전개**(결과 확정, 수치 대폭 변경 등)가 있을 때만 "후속"으로 올린다.
 
 ## 2. 뉴스 훑기
@@ -49,7 +49,7 @@ WebSearch(standard)로 아래를 한 번에 병렬로 찾는다. 최근 12시간
 | 신선도 (2시간 이내 2, 12시간 이내 1) | 0~2 |
 | 숫자나 대비로 한눈에 보여줄 수 있음 | 0~1 |
 
-- **7점 이상만 게시.** 9점 이상 + 2시간 이내 = 초대형 속보 (`urgency: "breaking"`, 간격 규칙 예외).
+- **7점 이상만 게시.** 9점 이상 + 2시간 이내 = 초대형 속보 (`urgency: "breaking"`, 표지에 `badge: "속보"`).
 - 7점 미만뿐이면 `node engine/state.mjs skip "<후보 요약과 최고점>"` 후 종료.
 
 ## 3. 사실 확인 (가장 중요)
@@ -175,6 +175,8 @@ node engine/render.mjs posts/<id>
       "threadsData":{},
       "facebookData":{"type":"POST"}}
      ```
+   - `text` 는 `caption.txt` 를 **한 글자도 바꾸지 않고** 그대로 넣는다. 쓰레드 500자 확인은 `publish.mjs` 가 caption.txt 로 했으니,
+     글을 고쳤다면 caption.txt 를 고치고 `publish.mjs` 를 다시 돌려 통과한 뒤에만 예약한다.
    - 오류가 나면 **바로 다시 만들지 말 것** (중복 게시 위험). `getScheduledPosts` 로 그 시간대에 이미 생겼는지 먼저 확인하고, 없을 때만 한 번 더 시도. 그래도 실패하면 기록 후 종료.
    - 만든 뒤 `getScheduledPosts` 로 그 게시물의 `providers` 에 instagram·threads·facebook 세 개가 모두 있는지 본다.
      한 곳이 빠졌으면 그 곳만 따로 새 게시물을 만들지 말고(중복 위험) 보고 줄에 "<네트워크> 빠짐"을 적는다.
