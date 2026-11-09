@@ -7,6 +7,11 @@ import path from 'node:path';
 import { ROOT, REPO, commitAndPush, git } from './git.mjs';
 import { checkCaptionFile } from './caption.mjs';
 
+// Owner stopped the automation on 2026-11-09: while state/STOP exists, nothing gets published.
+if (fs.existsSync(path.join(ROOT, 'state', 'STOP'))) {
+  console.error('automation stopped (state/STOP exists) - not publishing');
+  process.exit(9);
+}
 const postDir = path.resolve(process.argv[2] || '');
 if (!fs.existsSync(path.join(postDir, 'post.json'))) {
   console.error(`no post.json in ${postDir}`);
